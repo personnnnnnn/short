@@ -1,7 +1,10 @@
-export function startup<T = {}>(width: number, height: number): Short & T;
-export function startup<T = {}>(canvas: HTMLCanvasElement): Short & T;
-export function startup<T = {}>(selecter: string): Short & T;
-export function startup<T = {}>(
+export default function startup<T = {}>(
+  width: number,
+  height: number
+): Short & T;
+export default function startup<T = {}>(canvas: HTMLCanvasElement): Short & T;
+export default function startup<T = {}>(selecter: string): Short & T;
+export default function startup<T = {}>(
   a: HTMLCanvasElement | number | string,
   b?: number
 ): Short & T {
@@ -30,25 +33,69 @@ export function startup<T = {}>(
   throw new Error(`Invalid arguments: ${arguments}`);
 }
 
+export { startup };
+
+export type KeyboardData = {
+  key: string;
+  ctrl: boolean;
+  shift: boolean;
+  alt: boolean;
+  meta: boolean;
+  repeat: boolean;
+  isControlKey: boolean;
+};
+
+export function isControlKey(key: string): boolean {
+  return (
+    key === "Control" || key === "Shift" || key === "Alt" || key === "Meta"
+  );
+}
+
+export function transformKeyboardEvent(e: KeyboardEvent): KeyboardData {
+  return {
+    key: e.key,
+    ctrl: e.ctrlKey,
+    shift: e.shiftKey,
+    alt: e.altKey,
+    meta: e.metaKey,
+    repeat: e.shiftKey,
+    isControlKey: isControlKey(e.key),
+  };
+}
+
 export type Event<Data = void> = (data: Data) => Promise<void>;
 export type UpdateEvent = Event<{ delta: number }>;
 export type DrawEvent = Event;
 export type InitializeEvent = Event;
 export type LoadEvent = Event;
+export type CanvasKeyboardEvent = Event<KeyboardData>;
+export type KeyPressEvent = CanvasKeyboardEvent;
 
 type Events = {
   readonly update: UpdateEvent[];
   readonly draw: DrawEvent[];
   readonly initialize: InitializeEvent[];
+  readonly keyUp: KeyPressEvent[];
+  readonly keyDown: KeyPressEvent[];
 };
 
 export type FontStyle = "normal" | "italic" | "bold" | "bold italic" | "";
 
 export class Short {
+  isControlKey(key: string): boolean {
+    return isControlKey(key);
+  }
+
+  transformKeyboardEvent(e: KeyboardEvent): KeyboardData {
+    return transformKeyboardEvent(e);
+  }
+
   private readonly events: Events = {
     update: [],
     draw: [],
     initialize: [],
+    keyUp: [],
+    keyDown: [],
   };
 
   private readonly ctx: CanvasRenderingContext2D;
@@ -78,6 +125,9 @@ export class Short {
 
   constructor(private canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext("2d")!;
+
+    window.addEventListener("keydown", (e) => void this.keyDownCallback(e));
+    window.addEventListener("keyup", (e) => void this.keyUpCallback(e));
   }
 
   get going(): boolean {
@@ -132,15 +182,6 @@ export class Short {
 
   clearBeforeDraw(clearBeforeDraw: boolean = true): this {
     this.doClearBeforeDraw = clearBeforeDraw;
-    return this;
-  }
-
-  retainCanvas(): this {
-    return this.clearBeforeDraw(false);
-  }
-
-  giveID(id: string): this {
-    this.canvas.id = id;
     return this;
   }
 
@@ -240,6 +281,16 @@ export class Short {
     return this;
   }
 
+  onKeyUp(event: CanvasKeyboardEvent): this {
+    this.events.keyUp.push(event);
+    return this;
+  }
+
+  onKeyDown(event: CanvasKeyboardEvent): this {
+    this.events.keyDown.push(event);
+    return this;
+  }
+
   backgroundColor(color: string): this {
     this.canvas.style.backgroundColor = color;
     return this;
@@ -321,5 +372,19 @@ export class Short {
     await this.updateCallback();
     await this.drawCallback();
     this.frameCount++;
+  }
+
+  private async keyUpCallback(e: KeyboardEvent): Promise<void> {
+    const data = transformKeyboardEvent(e);
+    for (const event of this.events.keyUp) {
+      await event(data);
+    }
+  }
+
+  private async keyDownCallback(e: KeyboardEvent): Promise<void> {
+    const data = transformKeyboardEvent(e);
+    for (const event of this.events.keyDown) {
+      await event(data);
+    }
   }
 }

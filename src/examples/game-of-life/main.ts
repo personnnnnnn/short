@@ -1,4 +1,4 @@
-import { startup } from "../../short.js";
+import startup from "../../short.js";
 
 export type Context = typeof short;
 
