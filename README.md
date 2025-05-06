@@ -4,6 +4,8 @@ Short is a p5js-like library I am making because of my never ending boredom.
 
 Examples can be found in the `src/examples` directory.
 
+It's still not complete, so expect potential breaking changes.
+
 # When downloading the repository (this is more for me):
 
 ## Install all npm packages
