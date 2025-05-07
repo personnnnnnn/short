@@ -4,8 +4,8 @@ const short = startup<{ x: number; y: number }>(400, 400)
   .parentToBody()
   .backgroundColor("#eee")
   .onMouseMove(async (e) => {
-    short.x = e.absX;
-    short.y = e.absY;
+    short.x = e.x;
+    short.y = e.y;
   })
   .onInitialize(async () => {
     short.x = 0;
