@@ -14,12 +14,5 @@ const short = startup<{ x: number; y: number }>(400, 400)
   .onDraw(async () => {
     short.fill("#fff");
     short.square(short.x, short.y, 50);
-    short.textAlign("left");
-    short.textBaseline("top");
-    short.text(
-      0,
-      0,
-      `FPS: ${Math.floor(short.time.framesPerSecond * 10) / 10}`
-    );
   })
   .start();
