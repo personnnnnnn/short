@@ -13,6 +13,6 @@ const short = startup<{ x: number; y: number }>(400, 400)
   })
   .onDraw(async () => {
     short.fill("#fff");
-    short.square(short.x, short.y, 50);
+    short.square(short.x - 25, short.y - 25, 50);
   })
   .start();
