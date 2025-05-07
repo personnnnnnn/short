@@ -63,6 +63,57 @@ export function transformKeyboardEvent(e: KeyboardEvent): KeyboardData {
   };
 }
 
+export const LEFT_MOUSE = 0;
+export const MIDDLE_MOUSE = 1;
+export const RIGHT_MOUSE = 2;
+export const FORWARD_MOUSE = 3;
+export const BACKWARD_MOUSE = 4;
+
+export type MouseButton = 0 | 1 | 2 | 3 | 4;
+
+export type MouseData = {
+  absX: number;
+  absY: number;
+  x: number;
+  y: number;
+  dx: number;
+  dy: number;
+  ctrl: boolean;
+  shift: boolean;
+  alt: boolean;
+  meta: boolean;
+  button: MouseButton;
+  buttons: { [key in MouseButton]: boolean };
+};
+
+function getButtons(e: MouseEvent): { [key in MouseButton]: boolean } {
+  const getButton = (button: MouseButton) => Boolean(e.buttons & (1 << button));
+  return {
+    [LEFT_MOUSE]: getButton(LEFT_MOUSE),
+    [RIGHT_MOUSE]: getButton(RIGHT_MOUSE),
+    [MIDDLE_MOUSE]: getButton(MIDDLE_MOUSE),
+    [FORWARD_MOUSE]: getButton(FORWARD_MOUSE),
+    [BACKWARD_MOUSE]: getButton(BACKWARD_MOUSE),
+  };
+}
+
+export function transformMouseEvent(e: MouseEvent): MouseData {
+  return {
+    button: e.button as MouseButton,
+    buttons: getButtons(e),
+    absX: e.clientX,
+    absY: e.clientY,
+    x: e.offsetX,
+    y: e.offsetY,
+    dx: e.movementX,
+    dy: e.movementY,
+    ctrl: e.ctrlKey,
+    shift: e.shiftKey,
+    alt: e.altKey,
+    meta: e.metaKey,
+  };
+}
+
 export type Event<Data = void> = (data: Data) => Promise<void>;
 export type UpdateEvent = Event<{ delta: number }>;
 export type DrawEvent = Event;
@@ -70,6 +121,7 @@ export type InitializeEvent = Event;
 export type LoadEvent = Event;
 export type CanvasKeyboardEvent = Event<KeyboardData>;
 export type KeyPressEvent = CanvasKeyboardEvent;
+export type MouseInputEvent = Event<MouseData>;
 
 type Events = {
   readonly update: UpdateEvent[];
@@ -77,11 +129,24 @@ type Events = {
   readonly initialize: InitializeEvent[];
   readonly keyUp: KeyPressEvent[];
   readonly keyDown: KeyPressEvent[];
+  readonly mouseEnter: MouseInputEvent[];
+  readonly mouseExit: MouseInputEvent[];
+  readonly mouseMove: MouseInputEvent[];
+  readonly mouseUp: MouseInputEvent[];
+  readonly mouseDown: MouseInputEvent[];
+  readonly mouseClicked: MouseInputEvent[];
+  readonly mouseDoubleClicked: MouseInputEvent[];
 };
 
 export type FontStyle = "normal" | "italic" | "bold" | "bold italic" | "";
 
 export class Short {
+  readonly LEFT_MOUSE = LEFT_MOUSE;
+  readonly RIGHT_MOUSE = RIGHT_MOUSE;
+  readonly MIDDLE_MOUSE = MIDDLE_MOUSE;
+  readonly FORWARD_MOUSE = FORWARD_MOUSE;
+  readonly BACKWARD_MOUSE = BACKWARD_MOUSE;
+
   isControlKey(key: string): boolean {
     return isControlKey(key);
   }
@@ -96,6 +161,13 @@ export class Short {
     initialize: [],
     keyUp: [],
     keyDown: [],
+    mouseEnter: [],
+    mouseExit: [],
+    mouseMove: [],
+    mouseUp: [],
+    mouseDown: [],
+    mouseClicked: [],
+    mouseDoubleClicked: [],
   };
 
   private readonly ctx: CanvasRenderingContext2D;
@@ -128,6 +200,32 @@ export class Short {
 
     window.addEventListener("keydown", (e) => void this.keyDownCallback(e));
     window.addEventListener("keyup", (e) => void this.keyUpCallback(e));
+
+    this.canvas.addEventListener(
+      "click",
+      (e) => void this.mouseClickCallback(e)
+    );
+    this.canvas.addEventListener(
+      "dblclick",
+      (e) => void this.mouseDoubleClickCallback(e)
+    );
+    this.canvas.addEventListener(
+      "mouseup",
+      (e) => void this.mouseUpCallback(e)
+    );
+    this.canvas.addEventListener(
+      "mousedown",
+      (e) => void this.mouseDownCallback(e)
+    );
+    window.addEventListener("mousemove", (e) => void this.mouseMoveCallback(e));
+    this.canvas.addEventListener(
+      "mouseenter",
+      (e) => void this.mouseEnterCallback(e)
+    );
+    this.canvas.addEventListener(
+      "mouseleave",
+      (e) => void this.mouseExitCallback(e)
+    );
   }
 
   get going(): boolean {
@@ -291,6 +389,41 @@ export class Short {
     return this;
   }
 
+  onMouseEnter(event: MouseInputEvent): this {
+    this.events.mouseEnter.push(event);
+    return this;
+  }
+
+  onMouseExit(event: MouseInputEvent): this {
+    this.events.mouseExit.push(event);
+    return this;
+  }
+
+  onMouseMove(event: MouseInputEvent): this {
+    this.events.mouseMove.push(event);
+    return this;
+  }
+
+  onMouseUp(event: MouseInputEvent): this {
+    this.events.mouseUp.push(event);
+    return this;
+  }
+
+  onMouseDown(event: MouseInputEvent): this {
+    this.events.mouseDown.push(event);
+    return this;
+  }
+
+  onMouseClick(event: MouseInputEvent): this {
+    this.events.mouseClicked.push(event);
+    return this;
+  }
+
+  onMouseDoubleClick(event: MouseInputEvent): this {
+    this.events.mouseDoubleClicked.push(event);
+    return this;
+  }
+
   backgroundColor(color: string): this {
     this.canvas.style.backgroundColor = color;
     return this;
@@ -386,5 +519,48 @@ export class Short {
     for (const event of this.events.keyDown) {
       await event(data);
     }
+  }
+
+  private async mouseCallback(
+    e: MouseEvent,
+    callbacks: MouseInputEvent[],
+    isMouseMove: boolean = false
+  ): Promise<void> {
+    const data = transformMouseEvent(e);
+    if (isMouseMove) {
+      data.x -= this.canvas.clientLeft;
+      data.y -= this.canvas.clientTop;
+    }
+    for (const event of callbacks) {
+      await event(data);
+    }
+  }
+
+  private async mouseEnterCallback(e: MouseEvent): Promise<void> {
+    await this.mouseCallback(e, this.events.mouseEnter);
+  }
+
+  private async mouseExitCallback(e: MouseEvent): Promise<void> {
+    await this.mouseCallback(e, this.events.mouseExit);
+  }
+
+  private async mouseMoveCallback(e: MouseEvent): Promise<void> {
+    await this.mouseCallback(e, this.events.mouseMove, true);
+  }
+
+  private async mouseUpCallback(e: MouseEvent): Promise<void> {
+    await this.mouseCallback(e, this.events.mouseUp);
+  }
+
+  private async mouseDownCallback(e: MouseEvent): Promise<void> {
+    await this.mouseCallback(e, this.events.mouseDown);
+  }
+
+  private async mouseClickCallback(e: MouseEvent): Promise<void> {
+    await this.mouseCallback(e, this.events.mouseClicked);
+  }
+
+  private async mouseDoubleClickCallback(e: MouseEvent): Promise<void> {
+    await this.mouseCallback(e, this.events.mouseDoubleClicked);
   }
 }
